@@ -48,46 +48,63 @@ fn puzzle(allocator: std.mem.Allocator, input: []const u8) !u64 {
     const rowLength = lines.items[0].len;
 
     var total: u64 = 0;
-    var problemTotal: u64 = undefined;
+
+    var numbers = std.ArrayList(u64){};
+    defer numbers.deinit(allocator);
+    // start with last sign
+    var signIndex = signs.items.len - 1;
     for (0..rowLength) |ind| {
         const rev_ind = rowLength - 1 - ind;
         std.debug.print("col : {d}\n", .{rev_ind});
 
-        const sign = signs.items[rev_ind];
-
-        if (std.mem.eql(u8, sign, "*")) {
-            problemTotal = 1;
-        } else {
-            problemTotal = 0;
-        }
-
         var numBuff = try allocator.alloc(u8, numNumericRows);
+        defer allocator.free(numBuff);
         for (0..numNumericRows) |row| {
             std.debug.print("char : {c}\n", .{lines.items[row][rev_ind]});
             numBuff[row] = lines.items[row][rev_ind];
         }
 
         const trimmedNumBuff = std.mem.trim(u8, numBuff, " ");
-        if (trimmedNumBuff.len == 0) {
+
+        if (trimmedNumBuff.len != 0) {
+            const number = try std.fmt.parseInt(u64, trimmedNumBuff, 10);
+            try numbers.append(allocator, number);
+            std.debug.print("number : {d}\n", .{number});
+        }
+
+        if (trimmedNumBuff.len == 0 or rev_ind == 0) {
+            std.debug.print("numbers {any}\n", .{numbers.items});
+            const sign = signs.items[signIndex];
+
+            var problemTotal: u64 = undefined;
+            if (std.mem.eql(u8, sign, "*")) {
+                problemTotal = 1;
+                for (numbers.items) |n| {
+                    problemTotal *= n;
+                }
+            } else {
+                problemTotal = 0;
+                for (numbers.items) |n| {
+                    problemTotal += n;
+                }
+            }
+            std.debug.print("for {any} total was {d}\n", .{ numbers.items, problemTotal });
+
             total += problemTotal;
+
+            numbers.clearAndFree(allocator);
+
+            if (rev_ind != 0) {
+                signIndex -= 1;
+            }
             continue;
         }
-
-        const number = try std.fmt.parseInt(u64, trimmedNumBuff, 10);
-        if (std.mem.eql(u8, sign, "*")) {
-            problemTotal *= number;
-        } else {
-            problemTotal += number;
-        }
-
-
-        std.debug.print("number : {d}\n", .{number});
     }
 
     std.debug.print("line count : {d}\n", .{lines.items.len});
     std.debug.print("signs: {any}\n", .{signs.items});
 
-    return problemTotal;
+    return total;
 }
 
 fn readFile(allocator: std.mem.Allocator, filename: []const u8) ![]u8 {
